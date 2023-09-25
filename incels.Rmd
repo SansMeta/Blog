@@ -1,0 +1,345 @@
+---
+header-includes:
+   - \usepackage{bbm}
+   - \usepackage{mathtools}
+   - \usepackage{amsmath}
+---
+
+
+```{r setup2, include=FALSE}
+library(ggplot2)
+library(tidyr)
+library(gridExtra)
+library(cowplot)
+```
+
+
+
+
+# Can We Reduce the Number of Incels?
+
+There are two competing hypotheses explaining why some men are incels - in celibacy against their wishes. In this article I take an agnostic view on what holds true, and instead consider the societal impact of the following intervention in both scenarios: The quality of every current incel man is improved at least up to the level of the first non-incel man. The quality hypothesis asserts, that the predicament of incel men results from their lack of social and emotional skills, hygiene, money and because of their misogynistic worldview. If these shortcomings were improved adequately, as is the case in the intervention, the incel-cast should vanish. The rank hypothesis claim, that incels are partly a consequence of different mating proclivities of the genders, namely female hypergamy and male promisquity, which were unleashed by the change in social norms governing sexual behavior. Even if all current incels improved their relevant qualities and ended their celibacy by the intervention, the new bottom of the male hierarchy would then be cast into involuntary celibacy.
+
+
+
+### Introduction
+
+There is a group of males who live in involuntary celibacy (incels), without being able to fulfill the human desires of having sex, being touched, or feeling accepted. For some people this predicament can continue for years, driving them deeper into isolation, resentment and in rare cases even into violence.
+
+The explanations for the emergence of the incel phenomenon typically either underline the lack of attractive qualities in the incels, or focus on the changing norms on the mating market. The crucial difference between these approaches boils down to the underlying core issue: How do men and women choose partners?
+
+**Case 1.** Let's postulate, that men and women both only consider a candidate partner's perceived level of quality when choosing a short term mate, and not at all how the candidate compares to other candidates. It is possible, that an incel’s lack of female attraction is a consequence of, rather than the reason for their personal shortcomings and resentful misogynistic ideology. Therefore we could expect, that if every current incel would improve adequately, then no one would be left in celibacy against their wishes. I call this the **quality hypothesis**.
+
+**Case 2.** Now consider the possibility, that particularly females not only take into account the quality of the candidate, but also the rank of the candidate on the male hierarchy; How does the candidate compare to other males? This mating strategy is called hypergamy in the sociological literature. It is then possible that the incel phenomenon was born as a consequence of a shift in social norms governing sexual behavior. More specifically, 1) sex was detached from the marriage and it was no longer required to occur under monogamous social arrangement. A new sexual marketplace emerged, which set free 2) the hypergamous mating habits of females, i.e. the tendency on average to choose partners who are higher than them in the socioeconomic ranking, and 3) the promiscuous mating habits of males, making those with options capitalize on the overflow of female attention. This combination allows females to pick and share higher quality mates, without someone’s luck being another one’s loss. For males, this creates a highly unequal Pareto distribution of success with regard to female company. I call this the **rank hypothesis**, even though the rank only influences the female choice with an unknown weight $\alpha \in [0,1]$ relative to the quality.
+
+
+
+
+### Model
+
+
+Every person has a level of quality, referring to their social and emotional skills, personal hygiene, earning prospects, physical attributes, intelligence etc. The absolute qualities of men and women are drawn from normal distributions
+\begin{align*}
+    Q_{im} \sim \mathbb N(1,0.4) \\
+    Q_{iw} \sim \mathbb N(1,0.2)
+\end{align*}
+
+where lower index i stand for the individuals $i \in N^m, i \in N^w$, m and w denote the gender of the individual, and $N^m=N^w=:N$ is the population size of the given gender.
+
+The quality distribution of both sexes has the same expected value, but the male population is more variable than the female population, meaning that it produces more outliers in good and bad.
+
+This quality determines the likelihood of an individual meeting other people. For example, someone with good social skills and attractive face might end up on more dates than than someone lacking on those respects.
+
+Everyone also has a relative ranking within their gender, $R_{im}, R_{iw}=\{1,2,\dots N\}$, defined by the rank order of their quality $Q_{im}, Q_{iw}$. This rank impacts the chances of a meeting leading to a match in Case 2 below.
+
+The absolute qualities are used to define an NxN meeting matrix M with a likelihood for a meeting between every possible pair of men and women $M=Q_{m}Q_{w}^T$, with T denoting for a transpose.
+
+
+```{r init, echo=FALSE}
+# Population size
+N=1000
+
+# Relative status "rank"
+men = matrix(c(N:1), nrow=N, ncol=6)
+colnames(men) = c("rank", "value", "Case 1", "Case 2", "Case 3", "Case 4")
+women = men
+
+men[,2]   <- sort(rnorm(N, 1, 0.4), decreasing=TRUE)
+women[,2] <- sort(rnorm(N, 1, 0.2), decreasing=TRUE)
+
+neg=which(men[,2]<0)
+if(length(neg)>0) men[neg,2] <- 1e-4
+
+par(mfrow=c(1,3))
+
+df <- data.frame(x = men[,2], y = women[,2]) %>% 
+  gather(key, value)
+
+p = ggplot(df, aes(value, colour = key)) +
+  geom_density(show.legend = F) +
+  theme_minimal() +
+  xlab("Quality") +
+  scale_color_manual(values = c(x = "blue", y = "red"))
+
+plot_grid(p, labels = c("Quality"), hjust = -6)
+
+```
+
+
+
+
+
+
+
+Absolute qualities and meeting likelihoods of men and women
+
+
+\textbf{Baseline:} The actual number of sexual or romantic encounters $S_{ig}, g\in\{m,w\}$ for every man and woman only depends on their absolute qualities. It can be calculated as the sum of the row/column of M, or equivalently as
+\begin{align*}
+    S_{im}^b &= \gamma*Q_{im} \sum_{j = 1}^{N} Q_{jw} \\
+    S_{iw}^b &= \gamma*Q_{iw} \sum_{j = 1}^{N} Q_{jm}
+\end{align*}
+
+where the success parameter $\gamma>0$ describes the fraction of meetings that lead to a romantic encounter.
+
+In this scenario there are 0.6 \% of the population with less than one match, who are incels by definition. All of them are men. \\
+
+**Introducing hypergamy:** The number of sexual partners of women only depend on their absolute qualities, as before. But for men it also depends on their relative rank $R_{im}$ on the male hierarchy.
+\begin{align*}
+    S_{im}^h &= \gamma*\left[ Q_{im} \sum_{j = 1}^{N} Q_{jw} \right]^\alpha \left[\frac{(2R_{im})^2}{\alpha N^2}\right]^{1-\alpha}\\
+    S_{iw}^h &= S_{iw}^1*D
+\end{align*}
+
+where $\alpha\in(0,1]$ controls how important the male rank is for women and $D=\sum_{i=1}^N 
+ \frac{S_{im}^h}{S_{im}^b}$ distributes the change in the number of encounters, relative to Case 1, equally for all women. \\
+
+I will compare four cases, $\alpha\in \{1, 0.75, 0.5, 0.25\}$, where the first one corresponds to the Baseline.
+
+```{r incels before, echo=FALSE}
+## Matching
+success <- 1/100 # share of meetings which lead to sex
+meetings <- men[,2]%*%t(women[,2]) # Meeting matrix: Probability of meeting for each pair
+matches <- meetings*success
+
+# Define the social outcome function
+make_love_pre <- function(alpha, baseline=0, matches.=matches, rank=men[,1], N.=N){
+  m = apply(matches., 1, sum)^alpha * ((2*rank)^2/(alpha*N.^2))^(1-alpha)
+  diff=1
+  if(length(baseline)>1) diff = sum(m)/sum(baseline)
+  w = apply(t(matches.), 1, sum)*diff
+  
+  df <- data.frame(x = m, y = w) %>% 
+    gather(key, value)
+  
+  p = ggplot(df, aes(value, colour = key)) +
+    geom_density(show.legend = F) +
+    theme_minimal() +
+    xlab("Matches") +
+    scale_color_manual(values = c(x = "blue", y = "red"))+
+    geom_vline(xintercept=1, linetype="dashed", color = "black")
+  
+  incels = which(m<1)
+  n_incels = length(incels)
+  incels_w = which(w<1)
+  n_incels_w = length(incels_w)
+  #cat("\n Number of male incels: ", n_incels, ", ", round(n_incels/(N.*2)*100, 2), "%",
+  #    "\n Number of female incels: ", n_incels_w, ", ", round(n_incels_w/(N.*2)*100, 2), "%")
+  
+  return(list(p=p, m=m, w=w, inc=incels, incels=n_incels, incels_w=n_incels_w))
+}
+
+
+
+## Number of matches
+
+# Case 1: alpha=1. Man's rank doesn't impact his mating probability, only absolute qualities
+results <- make_love_pre(alpha=1)
+men[,3] <- results$m
+women[,3] <- results$w
+p1 <- results$p
+n_incels_1 <- results$incels
+n_incels_w_1 <- results$incels_w
+
+
+# Case 2: alpha=0.75
+results <- make_love_pre(alpha=0.75, baseline=men[,3])
+men[,4] <- results$m
+women[,4] <- results$w
+p2 <- results$p
+
+
+
+# Case 3: alpha=0.5
+results <- make_love_pre(alpha=0.5, baseline=men[,3])
+men[,5] <- results$m
+women[,5] <- results$w
+p3 <- results$p
+
+
+# Case 4: alpha=0.25
+results <- make_love_pre(alpha=0.25, baseline=men[,3])
+men[,6] <- results$m
+women[,6] <- results$w
+p4 <- results$p
+incels_4 <- results$inc
+
+
+# visualize
+plot_grid(p1, p2, p3, p4, labels = c("a=1", "a=0.75", "a=0.5", "a=0.25"), hjust = -6)
+```
+
+
+
+The histograms describe the distributions of the number of partners for men (blue) and women (red) in four scenarios, where only the women's mating proclivities differ. When the hypergamous tendency of women increases, the male hierarchy becomes Pareto-distributed, with some very successful men and many with barely no success. The dashed line at 1 partner gives the incel-cutoff.
+
+
+\begin{table}[H]
+    \centering
+    \begin{tabular}{l|c|c}
+         & Men & Women \\
+         \hline
+        $\alpha=1$ & 0.6 \% & 0 \\
+        $\alpha=0.75$ & 3.3 \% & 0 \\
+        $\alpha=0.5$ & 7.7 \% & 0 \\
+        $\alpha=0.25$ & 9.3 \% & 0 \\
+    \end{tabular}
+    \caption{Share of incels out of the population for both genders, in the four scenarios.}
+    \label{tab:my_label}
+\end{table}
+
+
+
+
+### Intervention
+
+Consider an intervention, which improves the absolute qualities $Q$ of every incel from the worst scenario ($\alpha=0.25$, with 9.3 \% incels), at least up to the same level of the first non-incel. This would include improving their job status, physical attractiveness and social skills, but also making their worldview potentially less resentful.
+
+
+```{r intervention, echo=FALSE}
+# Increase the absolute quality of every incel at least to the level of first non-incel
+women2 = women
+
+men2 = men
+men2[incels_4, 2] <- men[incels_4, 2] + men[min(incels_4)-1, 2]
+
+# Re-order by new absolute values
+men2 = men2[order(men2[,2], decreasing=TRUE),]
+
+# Assign new ranks
+men2[,1] = N:1
+
+df <- data.frame(x = men2[,2], y = women[,2], z=men[,2]) %>% 
+  gather(key, value)
+
+pi = ggplot(df, aes(value, colour = key)) +
+  geom_density(show.legend = F) +
+  theme_minimal() +
+  xlab("Quality") +
+  scale_color_manual(values = c(x = "blue", y = "red"))
+
+
+## Matching again
+meetings <- men2[,2]%*%t(women2[,2])
+matches <- meetings*success
+
+# Define the social outcome function
+make_love_post <- function(alpha, old, baseline=0, matches.=matches, rank=men2[,1], N.=N){
+  m = apply(matches., 1, sum)^alpha * ((2*rank)^2/(alpha*N.^2))^(1-alpha)
+  diff=1
+  if(length(baseline)>1) diff = sum(m)/sum(baseline)
+  w = apply(t(matches.), 1, sum)*diff
+  
+  df <- data.frame(x = m, y = w, z = old[,1], v = old[,2]) %>% 
+    gather(key, value)
+  
+  p = ggplot(df, aes(value, colour = key)) +
+    geom_density(show.legend = F) +
+    theme_minimal() +
+    xlab("Matches") +
+    scale_color_manual(values = c(x = "cyan", y = "pink", z="blue", v="red"))+
+    geom_vline(xintercept=1, linetype="dashed", color = "black")
+  
+  
+  incels = which(m<1)
+  n_incels = length(incels)
+  incels_w = which(w<1)
+  n_incels_w = length(incels_w)
+  #cat("\n Number of male incels: ", n_incels, ", ", round(n_incels/(N.*2)*100, 2), "%",
+  #    "\n Number of female incels: ", n_incels_w, ", ", round(n_incels_w/(N.*2)*100, 2), "%")
+  
+  return(list(p=p, m=m, w=w, incels=n_incels, incels_w=n_incels_w))
+}
+
+
+
+
+## Number of matches after intervention
+
+# Case 1: Man's rank doesn't impact his mating probability, only absolute qualities
+results <- make_love_post(alpha=1, old=cbind(men[,3], women[,3]))
+men2[,3] <- results$m
+women2[,3] <- results$w
+pi1 <- results$p
+n_incels_i_1 <- results$incels
+n_incels_w_i_1 <- results$incels_w
+
+
+# Case 2: alpha=0.75
+results <- make_love_post(alpha=0.75, baseline=men2[,3], old=cbind(men[,4], women[,4]))
+pi2 <- results$p
+
+
+# Case 3: alpha=0.5
+results <- make_love_post(alpha=0.5, baseline=men2[,3], old=cbind(men[,5], women[,5]))
+pi3 <- results$p
+
+
+# Case 4: alpha=0.25
+results <- make_love_post(alpha=0.25, baseline=men2[,3], old=cbind(men[,6], women[,6]))
+pi4 <- results$p
+
+
+
+
+# visualize
+plot_grid(pi, labels = c("Quality"), hjust = -6)
+```
+
+
+
+
+### Results
+
+**Baseline:** The incel problem is successfully eradicated, as all men now meet the absolute standard that is demanded by women. The amount of sexual encounters increase for both sexes. \\
+
+\noindent **Cases 2-4:** The impact of the intervention on the share of incels diminishes sharply, when hypergamous tendency increases (smaller $\alpha$). The remaining incel-population does not necessarily compose of the same individuals as before. If the rank hypothesis holds true even partly, then the incel phenomenon can't be solved by only improving the absolute qualities of men. There will always be a bottom x \%, regardless of how the population is shuffled. Any specific man doesn't have to be an incel, but someone will be.
+
+
+```{r incels after, echo=FALSE}
+plot_grid(pi1, pi2, pi3, pi4, labels = c("a=1", "a=0.75", "a=0.5", "a=0.25"), hjust = -6)
+```
+
+
+\begin{table}[]
+    \centering
+    \begin{tabular}{l|c|c}
+         & Men & Women \\
+         \hline
+        $\alpha=1$ & 0 & 0 \\
+        $\alpha=0.75$ & 1.4\% & 0 \\
+        $\alpha=0.5$ & 6.5\% & 0 \\
+        $\alpha=0.25$ & 8.9\% & 0 \\
+    \end{tabular}
+    \caption{Share of incels out of the population for both genders.}
+    \label{tab:my_label}
+\end{table}
+\section{Conclusion}
+
+In this article I considered the impact of a perfect intervention, in which every current incel man is made more attractive to women, at least up to the standard that women currently demand. These men land jobs, become more hygienic, less misogynistic, more fit and develop better social and emotional skills. Many commentators have suggested a weaker variant of this intervention as a solution to the incel problem.
+
+We find out, that this intervention is very effective, if it is the case, that women only choose their partners based on their absolute qualities. However, if women also take the relative status of the candidate in the male hierarchy into account, then the intervention has only a limited impact.
+
+Traditionally the incel problem was solved by socially upholding the norm of monogamy, by allowing sex to only take place within a marriage. This restrained both female hypergamy and male promiscuity, creating a sexual socialism of sort.
+
+It is not certain what ought to be done to the incel problem, if anything. But it is important to do cost-benefit analysis for different social contracts and to understand the impact of underlying assumptions on the effectiveness of potential policy choices.
+
